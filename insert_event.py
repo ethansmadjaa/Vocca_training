@@ -1,10 +1,49 @@
 from googleapiclient.discovery import build
-from datetime import datetime, timedelta, timezone
+from google.api_core import retry
+from googleapiclient.errors import HttpError
 
 import credentials
 
 
-def insert_event():
+async def insert_event(summary, location, description, start, end):
+    """Inserts an event into the user's primary Google Calendar."""
+    creds = credentials.get_credentials()
+    service = build('calendar', 'v3', credentials=creds)
+
+    event = {
+        'summary': summary,
+        'location': location,
+        'description': description,
+        'start': {
+            'dateTime': start,
+            'timeZone': 'Europe/Paris',
+        },
+        'end': {
+            'dateTime': end,
+            'timeZone': 'Europe/Paris',
+        },
+    }
+
+    try:
+        event = service.events().insert(calendarId='primary', body=event).execute()
+        print(f'Event created successfully: {event.get("htmlLink")}')
+        return event
+    except HttpError as e:
+        if e.resp.status == 409:
+            print('Conflict: This time slot is already booked')
+            raise ValueError("This time slot is already booked")
+        elif e.resp.status == 403:
+            print('Permission denied: Please check calendar access')
+            raise ValueError("Calendar access error")
+        else:
+            print(f'An error occurred: {e}')
+            raise
+    except Exception as e:
+        print(f'An unexpected error occurred: {e}')
+        raise
+
+
+def insert_event_test():
     """Inserts an event into the user's primary Google Calendar."""
     creds = credentials.get_credentials()
     service = build('calendar', 'v3', credentials=creds)
@@ -22,22 +61,10 @@ def insert_event():
             'dateTime': '2024-12-01T12:00:00',
             'timeZone': 'America/New_York',
         },
-        'attendees': [
-            {'email': 'attendee1@example.com'},
-            {'email': 'attendee2@example.com'},
-        ],
-        'reminders': {
-            'useDefault': False,
-            'overrides': [
-                {'method': 'email', 'minutes': 60},
-                {'method': 'popup', 'minutes': 10},
-            ],
-        },
     }
 
     try:
-        # Insert the event into the calendar
-        event_result = service.events().insert(calendarId='primary', body=event, sendUpdates='all').execute()
+        event_result = service.events().insert(calendarId='primary', body=event).execute()
         print('Event created: %s' % (event_result.get('htmlLink')))
     except Exception as e:
         print(f'An error occurred: {e}')
