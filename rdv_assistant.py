@@ -101,7 +101,7 @@ async def main():
         
         tts = CartesiaTTSService(
             api_key=os.getenv("CARTESIA_API_KEY"),
-            voice_id=os.getenv("CARTESIA_VOICE_ID"),
+            voice_id='65b25c5d-ff07-4687-a04c-da2f43ef6fa9',
             model="sonic-multilingual",
         )
 
@@ -142,7 +142,7 @@ async def main():
                 "content": f"""
                     Tu es Vocca, un assistant vocal spécialisé dans la prise de rendez-vous pour le Dr. SMADJA, médecin généraliste.
                     Tu dois:
-                    1. Accueillir poliment le patient
+                    1. Accueillir poliment le patient et dire que tu es l'assistatnte du docteur SMADJA
                     2. Demander le motif de leur appel
                     3. Si c'est pour un rendez-vous:
                         - Demander le nom du patient
