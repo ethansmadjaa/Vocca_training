@@ -15,7 +15,7 @@ from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.services.cartesia import CartesiaTTSService
-from pipecat.services.openai import OpenAILLMContext, OpenAILLMService
+from pipecat.services.openai import OpenAILLMContext, OpenAILLMService, OpenAITTSService
 from pipecat.transports.services.daily import DailyParams, DailyTransport
 from pipecat.transports.services.daily import DailyParams, DailyTransport, DailyTranscriptionSettings
 
@@ -99,11 +99,8 @@ async def main():
         )
         )
         
-        tts = CartesiaTTSService(
-            api_key=os.getenv("CARTESIA_API_KEY"),
-            voice_id='65b25c5d-ff07-4687-a04c-da2f43ef6fa9',
-            model="sonic-multilingual",
-        )
+        tts = OpenAITTSService(api_key=os.getenv("OPENAI_API_KEY"), voice="alloy")
+
 
         llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-4o")
 
