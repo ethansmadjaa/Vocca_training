@@ -17,6 +17,8 @@ from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.services.cartesia import CartesiaTTSService
 from pipecat.services.openai import OpenAILLMContext, OpenAILLMService
 from pipecat.transports.services.daily import DailyParams, DailyTransport
+from pipecat.transports.services.daily import DailyParams, DailyTransport, DailyTranscriptionSettings
+
 
 from openai.types.chat import ChatCompletionToolParam
 
@@ -35,11 +37,6 @@ logger.add(sys.stderr, level="DEBUG")
 
 
 async def start_insert_appointment_function(function_name, llm, context):
-    # note: we can't push a frame to the LLM here. the bot
-    # can interrupt itself and/or cause audio overlapping glitches.
-    # possible question for Aleix and Chad about what the right way
-    # to trigger speech is, now, with the new queues/async/sync refactors.
-    # await llm.push_frame(TextFrame("Let me check on that."))
     logger.debug(f"Starting insert event: {function_name} ")
 
 
@@ -52,7 +49,6 @@ async def schedule_appointment(function_name, tool_call_id, args, llm, context, 
         if not patient_name or not appointment_start:
             raise ValueError("Patient name and appointment time are required.")
 
-        # Parse the ISO format datetime
         appointment_datetime = datetime.fromisoformat(appointment_start)
 
         # Set event details
@@ -89,21 +85,28 @@ async def main():
             token,
             "Vocca, Ton assistant médical !",
             DailyParams(
-                audio_out_enabled=True,
-                transcription_enabled=True,
-                vad_enabled=True,
-                vad_analyzer=SileroVADAnalyzer(),
-            ),
+            audio_out_enabled=True,
+            vad_enabled=True,
+            vad_analyzer=SileroVADAnalyzer(),
+            transcription_enabled=True,
+            transcription_settings=DailyTranscriptionSettings(
+            language="fr-FR",  # Use fr-FR for French
+            model="nova-2-general",  # Specify the model
+            profanity_filter=True,
+            punctuate=True,
+            interim_results=True
         )
-
+        )
+        )
+        
         tts = CartesiaTTSService(
             api_key=os.getenv("CARTESIA_API_KEY"),
             voice_id=os.getenv("CARTESIA_VOICE_ID"),
+            model="sonic-multilingual",
         )
 
         llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-4o")
-        # Register a function_name of None to get all functions
-        # sent to the same callback with an additional function_name parameter.
+
         llm.register_function(
             "insert_appointment",
             schedule_appointment,
@@ -125,31 +128,33 @@ async def main():
                             },
                             "appointment_start": {
                                 "type": "string",
-                                "description": "Date and time of the start of the appointment in YYYY-MM-DDTHH:MM:SS "
-                                               "format."},
+                                "description": "Date and time of the start of the appointment in YYYY-MM-DDTHH:MM:SS format."},
                         },
                         "required": ["patient_name", "appointment_start"]
                     }
                 },
             )
         ]
+
         messages = [
             {
                 "role": "system",
-                "content": """
+                "content": f"""
                     Tu es Vocca, un assistant vocal spécialisé dans la prise de rendez-vous pour le Dr. SMADJA, médecin généraliste.
                     Tu dois:
                     1. Accueillir poliment le patient
                     2. Demander le motif de leur appel
                     3. Si c'est pour un rendez-vous:
-                       - Demander le nom du patient
-                       - Demander la date et l'heure souhaitées
-                       - Confirmer les détails avant de programmer
+                        - Demander le nom du patient
+                        - Demander la date et l'heure souhaitées
+                        - Confirmer les détails avant de programmer
                     4. Si ce n'est pas pour un rendez-vous, expliquer poliment que tu ne peux gérer que les rendez-vous
                     
                     Sois toujours professionnel, patient et bienveillant.
                     Même si le patient parle en anglais, réponds toujours en français.
                     N'utilise pas de caractères spéciaux.
+                    la date d'aujourd'hui est le {datetime.now().strftime("%d/%m/%Y")}
+                    si l''utilisateur demande quelqque chose qui n'est pas en rapport avec le Dr smadja, ne pas lui repondre et l'orienter gentiment vers le web
                     """,
             },
         ]
